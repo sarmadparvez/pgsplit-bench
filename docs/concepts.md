@@ -425,8 +425,16 @@ storage, then an idle database can **suspend its compute entirely** and resume l
 data. Neon and Lakebase both offer this **scale-to-zero**.[^databricks-lakebase] The monolith has no
 equivalent — its node is always on or fully off — so the fair comparison is not "who starts faster"
 but "what does an always-on node cost when nothing is happening." Experiment 5 measures the other
-side of that trade: the **cold-start latency** from a scaled-to-zero compute to its first successful
+side of that trade: the **cold-start latency** from a suspended compute to its first successful
 query, which is the price you pay for not running (and paying for) an idle machine.
+
+One reproduction caveat: the *automatic* scale-to-zero — idle detection and the autoscaler that
+suspends and resumes compute — lives in Neon's managed control plane, not in the self-hostable
+open-source stack (whose `docker-compose` ships compute, pageserver, safekeepers, storage broker,
+and MinIO, but no autoscaler). Locally, experiment 5 therefore *simulates* scale-to-zero by stopping
+the compute container and timing its restart to first query. That reproduces the cold-start cost —
+the number the experiment is after — even though the idle-detection automation isn't part of the
+local stack.
 
 ```
 Idle compute suspends; durable state stays in the storage tier

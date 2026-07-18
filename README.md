@@ -18,6 +18,37 @@ Note: Databricks Lakebase itself is a managed cloud service and isn't free to ru
 
 Two targets, both speaking the Postgres wire protocol, on the same host under the same resource limits:
 
+```
+Monolith                          Separated — self-hosted Neon
+
+┌───────────────────┐             ┌───────────────────┐
+│ Postgres          │             │ Postgres (compute)│  stateless,
+│  ├ query engine   │             │  ├ query engine   │  scales to zero
+│  ├ buffers        │             │  ├ buffers        │
+│  ├ WAL   ──┐      │             │  └ WAL ──┐        │
+│  └ data files◄┘   │             └──────────┼────────┘
+│      (local disk) │                        │ WAL over the network
+└───────────────────┘                        ▼
+                                   ┌───────────────────┐
+compute + storage fused;          │ safekeepers (×3)  │  durable WAL,
+a commit = one local fsync        │  Paxos quorum     │  commit on quorum
+                                   └─────────┬─────────┘
+                                             │ WAL stream
+                                             ▼
+                                   ┌───────────────────┐
+                                   │ pageserver        │  rebuilds pages
+                                   │  base + WAL deltas│  from the WAL stream
+                                   └─────────┬─────────┘
+                                             │ layer files
+                                             ▼
+                                   ┌───────────────────┐
+                                   │ object storage    │  cheap, durable
+                                   │  (S3 / MinIO)     │
+                                   └───────────────────┘
+```
+
+The monolith is one fused node; the separated target splits stateless Postgres compute from a durable, tiered storage service. [Databricks Lakebase](https://www.databricks.com/blog/announcing-lakebase-public-preview) is the managed product built on this design — here we self-host its open-source engine (Neon) so it runs locally and free. For the theory behind every box above, see the **[Concepts guide](docs/concepts.md)**.
+
 | Target | What it is | Shape |
 | --- | --- | --- |
 | **monolith** | `postgres:17` in Docker | Compute + storage fused in one node; commits `fsync` to local disk |
@@ -37,7 +68,7 @@ Each experiment isolates one architectural difference and produces one chart. Th
 
 4. **Storage footprint of a copy** — measure disk used by the second copy immediately after experiment 3, then after mutating X% of rows, to show copy-on-write growth in proportion to changes rather than total size.
 
-5. **Cold start / cost of idle** — scale the separated compute to zero, then time start → first successful query. The monolith has no scale-to-zero equivalent; this reframes the comparison around the cost of an always-on node.
+5. **Cold start / cost of idle** — suspend the separated compute and time resume → first successful query. The managed automatic scale-to-zero (idle detection, autoscaler) is not part of the self-hostable OSS stack, so here it's simulated by stopping the compute container and restarting it — which still measures the quantity that matters: the cold-start latency you pay for not keeping the node running. The monolith has no scale-to-zero equivalent; this reframes the comparison around the cost of an always-on node.
 
 ## Datasets
 
@@ -86,7 +117,8 @@ pgsplit-bench/
 
 ## Interpreting results
 
-- **Match the setup fairly.** Same Postgres major version, same CPU/memory limits on both containers, warm-up runs discarded, multiple trials reported as medians.
+- **Match the setup fairly.** Same Postgres major version; pin the separated target's *compute* container to the same CPU/memory limits as the monolith; warm-up runs discarded; multiple trials reported as medians.
+- **The separated target is a whole stack, not one container.** Alongside its compute node it runs a pageserver, three safekeepers, a storage broker, and MinIO — always-on processes that consume extra host CPU, memory, and disk. That overhead is intrinsic to the architecture, and it's why "runnable for free" here means local reproduction of the *shapes*, not a claim about production cost or total resource use.
 - **Expect the monolith to win some.** The separated target routes every commit across an intra-host hop to the safekeeper quorum instead of a local `fsync`, so single-node write latency can be higher. That's the cost of the separation, not a misconfiguration — and it's part of what the benchmark is meant to reveal.
 - **Trust the curves, not the constants.** A laptop won't reproduce cloud absolute numbers. The flat-vs-linear branching curve and the WAL reduction from disabling full-page writes are the durable takeaways.
 
