@@ -27,7 +27,7 @@ Both compute layers are pinned to the same Postgres major version so version dif
 
 Each experiment isolates one architectural difference and produces one chart. The trustworthy signal is the **shape** of each result, not laptop-specific absolute numbers.
 
-1. **Write throughput + WAL efficiency** — the "5x writes" claim. Run write-heavy `pgbench` at rising client counts; record TPS and WAL bytes per transaction. Includes a control on the monolith with `full_page_writes` on vs off, which isolates the exact mechanism the separated architecture exploits (no local disk ⇒ torn pages can't occur ⇒ FPW can be safely disabled).
+1. **Write throughput + WAL efficiency** — the "5x writes" claim. Run write-heavy `pgbench` at rising client counts; record TPS and WAL bytes per transaction. Includes a control on the monolith with `full_page_writes` on vs off, which isolates the exact mechanism the separated architecture exploits (compute never persists data pages to local disk ⇒ torn pages can't occur ⇒ FPW can be safely disabled).
 
 2. **Read latency under concurrency** — `pgbench -S` (read-only) at 1/4/8/16/32 clients; record p50/p95/p99.
 
