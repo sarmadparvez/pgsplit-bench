@@ -4,6 +4,8 @@ Benchmark monolithic Postgres against compute/storage-separated Postgres (Neon) 
 
 > **Status:** early / scaffolding in progress. This README is the project spec; the harness and dashboard are being built out. See the [roadmap](#roadmap).
 
+> **New to WAL, full-page writes, or compute/storage separation?** Start with the **[Concepts guide](docs/concepts.md)** — it explains the theory these experiments test, from Postgres fundamentals up, with every claim referenced.
+
 ## Why
 
 Postgres deployments are moving from a **monolith** — one machine where the query engine, buffer cache, WAL, and data files all live together (this is what a classic managed instance like Azure PostgreSQL Flexible Server gives you) — toward **compute/storage separation**, where stateless compute streams WAL to a durable storage service that keeps full page history on object storage. This is the architecture behind Neon and, by extension, Databricks Lakebase.
