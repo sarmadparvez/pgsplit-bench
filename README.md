@@ -23,7 +23,7 @@ Monolith                          Separated — self-hosted Neon
 
 ┌───────────────────┐             ┌───────────────────┐
 │ Postgres          │             │ Postgres (compute)│  stateless,
-│  ├ query engine   │             │  ├ query engine   │  scales to zero
+│  ├ query engine   │             │  ├ query engine   │  can suspend/resume
 │  ├ buffers        │             │  ├ buffers        │
 │  ├ WAL   ──┐      │             │  └ WAL ──┐        │
 │  └ data files◄┘   │             └──────────┼────────┘
