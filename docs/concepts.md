@@ -171,13 +171,14 @@ An 8 KB page is ~16 disk sectors; a crash mid-write can tear it
 
   8 KB page  =  [s0][s1][s2][s3] … [s15]      (512-byte sectors)
 
-  power lost mid-write:
-        written        │      NOT written
-      ┌────┬────┬────┬─┴──┐        ┌────┬────┬────┐
+  power lost mid-write — some sectors reach disk, some don't:
+
+      ┌────┬────┬────┬────┐        ┌────┬────┬────┐
       │ s0 │ s1 │ s2 │ s3 │  …     │s13 │s14 │s15 │
-      │new │new │new │new │        │old │old │old │   ← half new, half old
+      │new │new │new │new │        │old │old │old │
       └────┴────┴────┴────┘        └────┴────┴────┘
-                       = TORN PAGE
+      └───── written ─────┘        └─ not written ┘
+                    = TORN PAGE (half new, half old)
 
   Replaying a small WAL delta onto a torn page → silent corruption.
 
